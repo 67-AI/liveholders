@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #111827;
+  }
+
+  .dark {
+    --background: #111827;
+    --foreground: #f9fafb;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50;
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}

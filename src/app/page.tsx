@@ -226,13 +226,20 @@ export default function Home() {
       const startTime = Date.now();
       
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.188:6767';
+      console.log('Fetching from:', backendUrl); // Debug log
+      
       const response = await fetch(`${backendUrl}/api/holders`);
+      console.log('Response status:', response.status); // Debug log
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText); // Debug log
+        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('Received data:', data); // Debug log
+      
       const holders = data.holders || 0;
       
       if (holders) {
@@ -250,6 +257,8 @@ export default function Home() {
           updateAnalytics(trimmedData, newDataPoint);
           return trimmedData;
         });
+      } else {
+        console.warn('No holder data received'); // Debug log
       }
 
       // Calculate next fetch delay

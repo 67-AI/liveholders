@@ -230,112 +230,61 @@ export default function Home() {
       
       let holders = 0;
       let timestamp = new Date();
-      let usedFallback = false;
 
+      // Try backend
+      console.log('Making request to backend:', backendUrl);
+      const response = await fetch(`${backendUrl}/api/holders`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        cache: 'no-cache'  // Disable caching
+      });
+      
+      console.log('Backend response status:', response.status);
+      console.log('Backend response headers:', Object.fromEntries(response.headers.entries()));
+      
+      let responseText;
       try {
-        // Try backend first
-        console.log('Making request to backend...');
-        const response = await fetch(`${backendUrl}/api/holders`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
-          cache: 'no-cache'  // Disable caching
-        });
-        
-        console.log('Backend response status:', response.status);
-        
-        let responseText;
-        try {
-          responseText = await response.text();
-          console.log('Raw backend response:', responseText);
-          
-          if (!response.ok) {
-            throw new Error(`Backend error: ${response.status} - ${responseText}`);
-          }
-          
-          const data = JSON.parse(responseText);
-          console.log('Parsed backend data:', data);
-          
-          if (data.success && data.holders > 0) {
-            holders = data.holders;
-            timestamp = new Date(data.timestamp);
-            console.log('Successfully fetched from backend:', holders);
-          } else {
-            console.error('Invalid data structure from backend:', data);
-            throw new Error('Invalid data from backend');
-          }
-        } catch (parseError) {
-          console.error('Error parsing backend response:', parseError);
-          console.error('Raw response text:', responseText);
-          throw parseError;
-        }
-      } catch (error: any) {
-        // Log the full error
-        console.error('Backend fetch failed with error:', error);
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-        
-        // If backend fails, fallback to Helius API
-        console.warn('Falling back to Helius API');
-        usedFallback = true;
-        
-        const heliusUrl = 'https://api.helius.xyz/v0/token-metadata';
-        const apiKey = 'e2d4b800-7644-4bb7-838b-aae1a3000b56';
-        
-        console.log('Making request to Helius...');
-        const response = await fetch(`${heliusUrl}?api-key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mintAccounts: ['9eF4iX4BzeKnvJ7gSw5L725jk48zJw2m66NFxHHvpump'],
-            includeOffChain: true,
-            disableCache: true
-          })
-        });
-
-        console.log('Helius response status:', response.status);
+        responseText = await response.text();
+        console.log('Raw backend response:', responseText);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Helius error response:', errorText);
-          throw new Error(`Helius API error: ${response.status} - ${errorText}`);
+          throw new Error(`Backend error: ${response.status} - ${responseText}`);
         }
-
-        const data = await response.json();
-        console.log('Helius response data:', data);
         
-        if (data && data[0] && data[0].offChainMetadata && data[0].offChainMetadata.metadata && data[0].offChainMetadata.metadata.holder_count) {
-          holders = parseInt(data[0].offChainMetadata.metadata.holder_count);
-          console.log('Successfully fetched from Helius:', holders);
+        const data = JSON.parse(responseText);
+        console.log('Parsed backend data:', data);
+        
+        if (data.success && data.holders > 0) {
+          holders = data.holders;
+          timestamp = new Date(data.timestamp);
+          console.log('Successfully fetched from backend:', holders);
+
+          setLastUpdated(timestamp);
+          const newDataPoint = {
+            timestamp,
+            holders: Math.floor(holders)
+          };
+          
+          setHolderData(prev => {
+            const updatedData = [...prev, newDataPoint];
+            const trimmedData = updatedData.slice(-1000);
+            saveToLocalStorage(trimmedData);
+            updateAnalytics(trimmedData, newDataPoint);
+            return trimmedData;
+          });
+
+          // Update document title with current holder count
+          document.title = `$LIVE Holders: ${holders.toLocaleString()}`;
         } else {
-          console.error('Invalid data structure from Helius:', data);
-          throw new Error('Invalid data structure from Helius');
+          console.error('Invalid data structure from backend:', data);
+          throw new Error('Invalid data from backend');
         }
-      }
-      
-      if (holders > 0) {
-        setLastUpdated(timestamp);
-        const newDataPoint = {
-          timestamp,
-          holders: Math.floor(holders)
-        };
-        
-        setHolderData(prev => {
-          const updatedData = [...prev, newDataPoint];
-          const trimmedData = updatedData.slice(-1000);
-          saveToLocalStorage(trimmedData);
-          updateAnalytics(trimmedData, newDataPoint);
-          return trimmedData;
-        });
-
-        // Update document title with current holder count
-        document.title = `$LIVE Holders: ${holders.toLocaleString()}${usedFallback ? ' (Helius)' : ''}`;
-      } else {
-        console.warn('No valid holder data received');
+      } catch (parseError) {
+        console.error('Error parsing backend response:', parseError);
+        console.error('Raw response text:', responseText);
+        throw parseError;
       }
 
       // Calculate next fetch delay
@@ -347,8 +296,8 @@ export default function Home() {
 
     } catch (error) {
       console.error('Error fetching data:', error);
-      // On error, retry after the normal interval
-      timeoutRef.current = setTimeout(startFetchCycle, updateFrequency * 1000);
+      // On error, retry after double the normal interval
+      timeoutRef.current = setTimeout(startFetchCycle, updateFrequency * 2000);
     } finally {
       fetchInProgressRef.current = false;
       lastFetchRef.current = Date.now();

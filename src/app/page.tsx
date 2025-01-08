@@ -228,6 +228,15 @@ export default function Home() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.188:6767';
       console.log('Fetching from:', backendUrl); // Debug log
       
+      // First try to get the health status
+      try {
+        const healthResponse = await fetch(`${backendUrl}/health`);
+        const healthData = await healthResponse.json();
+        console.log('Backend health:', healthData);
+      } catch (error) {
+        console.warn('Health check failed:', error);
+      }
+
       const response = await fetch(`${backendUrl}/api/holders`);
       console.log('Response status:', response.status); // Debug log
       
@@ -241,12 +250,12 @@ export default function Home() {
       console.log('Received data:', data); // Debug log
       
       const holders = data.holders || 0;
+      const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
       
-      if (holders) {
-        const now = new Date();
-        setLastUpdated(now);
+      if (holders > 0) {
+        setLastUpdated(timestamp);
         const newDataPoint = {
-          timestamp: now,
+          timestamp,
           holders: Math.floor(holders)
         };
         
@@ -258,7 +267,7 @@ export default function Home() {
           return trimmedData;
         });
       } else {
-        console.warn('No holder data received'); // Debug log
+        console.warn('No holder data received or holder count is 0'); // Debug log
       }
 
       // Calculate next fetch delay

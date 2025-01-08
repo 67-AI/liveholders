@@ -225,7 +225,7 @@ export default function Home() {
       fetchInProgressRef.current = true;
       const startTime = Date.now();
       
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://83.105.124.102:6767';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://83.105.124.102:6767';
       console.log('Attempting to fetch from backend:', backendUrl);
       
       let holders = 0;
@@ -308,11 +308,12 @@ export default function Home() {
         const data = await response.json();
         console.log('Helius response data:', data);
         
-        if (data && data[0] && data[0].onChainMetadata && data[0].onChainMetadata.currentSupply) {
-          holders = parseInt(data[0].onChainMetadata.currentSupply);
+        if (data && data[0] && data[0].offChainMetadata && data[0].offChainMetadata.metadata && data[0].offChainMetadata.metadata.holder_count) {
+          holders = parseInt(data[0].offChainMetadata.metadata.holder_count);
           console.log('Successfully fetched from Helius:', holders);
         } else {
           console.error('Invalid data structure from Helius:', data);
+          throw new Error('Invalid data structure from Helius');
         }
       }
       

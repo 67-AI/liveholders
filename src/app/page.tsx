@@ -225,7 +225,7 @@ export default function Home() {
       fetchInProgressRef.current = true;
       const startTime = Date.now();
       
-      const response = await fetch('/api/holders');
+      const response = await fetch('http://192.168.1.188:6767/api/holders');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

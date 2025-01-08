@@ -225,14 +225,42 @@ export default function Home() {
       fetchInProgressRef.current = true;
       const startTime = Date.now();
       
-      const response = await fetch('http://192.168.1.188:6767/api/holders');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // First try the local backend
+      let holders = 0;
+      try {
+        const backendResponse = await fetch('http://192.168.1.188:6767/api/holders');
+        if (backendResponse.ok) {
+          const backendData = await backendResponse.json();
+          holders = backendData.holders;
+        }
+      } catch (error) {
+        console.log('Local backend not available, falling back to Helius API');
       }
-      
-      const data = await response.json();
-      const holders = data.holders || 0;
+
+      // If local backend fails, use Helius API
+      if (!holders) {
+        const apiKey = 'e2d4b800-7644-4bb7-838b-aae1a3000b56';
+        const tokenAddress = '9eF4iX4BzeKnvJ7gSw5L725jk48zJw2m66NFxHHvpump';
+        
+        const response = await fetch(`https://api.helius.xyz/v0/token-metadata?api-key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mintAccounts: [tokenAddress],
+            includeOffChain: true,
+            disableCache: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        holders = data[0]?.onChainMetadata?.info?.supply?.holders || 0;
+      }
       
       if (holders) {
         const now = new Date();

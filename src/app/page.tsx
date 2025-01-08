@@ -226,31 +226,61 @@ export default function Home() {
       const startTime = Date.now();
       
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.188:6767';
-      console.log('Fetching from:', backendUrl); // Debug log
+      console.log('Attempting to fetch from backend:', backendUrl);
       
-      // First try to get the health status
-      try {
-        const healthResponse = await fetch(`${backendUrl}/health`);
-        const healthData = await healthResponse.json();
-        console.log('Backend health:', healthData);
-      } catch (error) {
-        console.warn('Health check failed:', error);
-      }
+      let holders = 0;
+      let timestamp = new Date();
+      let usedFallback = false;
 
-      const response = await fetch(`${backendUrl}/api/holders`);
-      console.log('Response status:', response.status); // Debug log
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText); // Debug log
-        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
+      try {
+        // Try backend first
+        const response = await fetch(`${backendUrl}/api/holders`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Backend error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.success && data.holders > 0) {
+          holders = data.holders;
+          timestamp = new Date(data.timestamp);
+          console.log('Successfully fetched from backend:', holders);
+        } else {
+          throw new Error('Invalid data from backend');
+        }
+      } catch (error) {
+        // If backend fails, fallback to Helius API
+        console.warn('Backend fetch failed, falling back to Helius:', error);
+        usedFallback = true;
+        
+        const heliusUrl = 'https://api.helius.xyz/v0/token-metadata';
+        const apiKey = 'e2d4b800-7644-4bb7-838b-aae1a3000b56';
+        
+        const response = await fetch(`${heliusUrl}?api-key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mintAccounts: ['9eF4iX4BzeKnvJ7gSw5L725jk48zJw2m66NFxHHvpump'],
+            includeOffChain: true,
+            disableCache: true
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Helius API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data && data[0] && data[0].onChainMetadata && data[0].onChainMetadata.currentSupply) {
+          holders = parseInt(data[0].onChainMetadata.currentSupply);
+          console.log('Successfully fetched from Helius:', holders);
+        }
       }
-      
-      const data = await response.json();
-      console.log('Received data:', data); // Debug log
-      
-      const holders = data.holders || 0;
-      const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
       
       if (holders > 0) {
         setLastUpdated(timestamp);
@@ -266,8 +296,11 @@ export default function Home() {
           updateAnalytics(trimmedData, newDataPoint);
           return trimmedData;
         });
+
+        // Update document title with current holder count
+        document.title = `$LIVE Holders: ${holders.toLocaleString()}${usedFallback ? ' (Helius)' : ''}`;
       } else {
-        console.warn('No holder data received or holder count is 0'); // Debug log
+        console.warn('No valid holder data received');
       }
 
       // Calculate next fetch delay

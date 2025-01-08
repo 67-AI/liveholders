@@ -234,33 +234,59 @@ export default function Home() {
 
       try {
         // Try backend first
+        console.log('Making request to backend...');
         const response = await fetch(`${backendUrl}/api/holders`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-          }
+          },
+          cache: 'no-cache'  // Disable caching
         });
         
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`);
-        }
+        console.log('Backend response status:', response.status);
         
-        const data = await response.json();
-        if (data.success && data.holders > 0) {
-          holders = data.holders;
-          timestamp = new Date(data.timestamp);
-          console.log('Successfully fetched from backend:', holders);
-        } else {
-          throw new Error('Invalid data from backend');
+        let responseText;
+        try {
+          responseText = await response.text();
+          console.log('Raw backend response:', responseText);
+          
+          if (!response.ok) {
+            throw new Error(`Backend error: ${response.status} - ${responseText}`);
+          }
+          
+          const data = JSON.parse(responseText);
+          console.log('Parsed backend data:', data);
+          
+          if (data.success && data.holders > 0) {
+            holders = data.holders;
+            timestamp = new Date(data.timestamp);
+            console.log('Successfully fetched from backend:', holders);
+          } else {
+            console.error('Invalid data structure from backend:', data);
+            throw new Error('Invalid data from backend');
+          }
+        } catch (parseError) {
+          console.error('Error parsing backend response:', parseError);
+          console.error('Raw response text:', responseText);
+          throw parseError;
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Log the full error
+        console.error('Backend fetch failed with error:', error);
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        
         // If backend fails, fallback to Helius API
-        console.warn('Backend fetch failed, falling back to Helius:', error);
+        console.warn('Falling back to Helius API');
         usedFallback = true;
         
         const heliusUrl = 'https://api.helius.xyz/v0/token-metadata';
         const apiKey = 'e2d4b800-7644-4bb7-838b-aae1a3000b56';
         
+        console.log('Making request to Helius...');
         const response = await fetch(`${heliusUrl}?api-key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -271,14 +297,22 @@ export default function Home() {
           })
         });
 
+        console.log('Helius response status:', response.status);
+        
         if (!response.ok) {
-          throw new Error(`Helius API error: ${response.status}`);
+          const errorText = await response.text();
+          console.error('Helius error response:', errorText);
+          throw new Error(`Helius API error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Helius response data:', data);
+        
         if (data && data[0] && data[0].onChainMetadata && data[0].onChainMetadata.currentSupply) {
           holders = parseInt(data[0].onChainMetadata.currentSupply);
           console.log('Successfully fetched from Helius:', holders);
+        } else {
+          console.error('Invalid data structure from Helius:', data);
         }
       }
       

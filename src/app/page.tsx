@@ -225,7 +225,7 @@ export default function Home() {
       fetchInProgressRef.current = true;
       const startTime = Date.now();
       
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.188:6767';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://83.105.124.102:6767';
       console.log('Attempting to fetch from backend:', backendUrl);
       
       let holders = 0;
